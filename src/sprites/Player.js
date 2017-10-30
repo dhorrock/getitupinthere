@@ -2,33 +2,26 @@ import Phaser from 'phaser'
 
 export default class extends Phaser.Sprite {
   constructor ({ game, x, y }) {
-    super(game, x, y, 'dude');
+    super(game, x, y, 'ground');
+    this.height = 32;
+    this.width = 124;
+    this.anchor.setTo(0.5, 0);
     this.initializePhysics();
-    this.initializeAnimations();
   }
 
   initializePhysics() {
     this.game.physics.enable(this);
-    this.body.bounce.y = 0.2;
-    this.body.gravity.y = 300;
     this.body.collideWorldBounds = true;
-  }
+    this.body.immovable = true;
 
-  initializeAnimations() {
-    this.animations.add('left', [0, 1, 2, 3], 10, true);
-    this.animations.add('right', [5, 6, 7, 8], 10, true);
   }
 
   watchForPlayerInput(cursors) {
+    this.body.velocity.x = 0;
     if(cursors.left.isDown) {
-      this.body.velocity.x = -150;
-      this.animations.play('left');
+      this.body.velocity.x = -300;
     } else if (cursors.right.isDown) {
-      this.body.velocity.x = 150;
-      this.animations.play('right');
-    } else {
-      this.animations.stop();
-      this.frame = 4;
+      this.body.velocity.x = 300;
     }
   }
 

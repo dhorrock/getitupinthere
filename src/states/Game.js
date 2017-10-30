@@ -4,10 +4,13 @@ import Mushroom from '../sprites/Mushroom'
 import Player from '../sprites/Player';
 import GameWorld from '../GameObjects/GameWorld';
 import Stars from '../GameObjects/Stars';
+import Ball from '../sprites/Ball';
 
 export default class Main extends Phaser.State {
   init () {
+    this.textStyle = { font: '18px Arial', fill: '#eee' };
     this.score = 0;
+    this.lives = 3;
   }
   preload () {}
 
@@ -15,48 +18,96 @@ export default class Main extends Phaser.State {
     this.initializePhysics();
     this.initializeGameWorld();
     this.initializePlayer();
-    this.initializeScoreBoard();
+    this.initializeBall();
+    this.initializeText();
   }
 
   initializePhysics() {
     this.game.physics.startSystem(Phaser.Physics.ARCADE);
+    this.game.physics.arcade.checkCollision.down = false;
   }
 
   initializeGameWorld() {
-    this.game.add.sprite(0, 0, 'sky');
-    this.platforms = new GameWorld({game: this.game})
-    this.stars = new Stars({game: this.game});
+    this.initializeBackground();
+    
+    this.blocks = new GameWorld({game: this.game})
+  }
+
+  initializeBackground() {
+    const bg = this.game.add.sprite(0, 0, 'background');
+    bg.width = this.game.width;
+    bg.height = this.game.height;
   }
 
   initializePlayer() {
-    this.player = new Player({game: this.game, x: 32, y: this.game.world.height - 150});
+    this.player = new Player({game: this.game, x: this.game.world.centerX, y: this.game.world.height - 32});
     this.game.add.existing(this.player);
   }
 
-  initializeScoreBoard() {
-    this.scoreText = game.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#000'});
+  initializeBall() {
+    this.ball = new Ball({game: this.game, x : this.game.world.centerX, y: this.game.world.height - this.game.world.centerY/2});
+    this.ball.body.velocity.set(150, -150);
+    this.game.add.existing(this.ball);
+    this.ball.checkWorldBounds = true;
+    this.ball.events.onOutOfBounds.add(this.OnBallLeaveScreen, this);
+  }
+
+  initializeText() {
+    this.scoreText = this.game.add.text(5, 5, 'Score: 0', this.textStyle);
+    this.livesText = this.game.add.text(this.game.world.width - 5, 5, 'Lives: ' + this.lives, this.textStyle);
+    this.livesText.anchor.set(1, 0);
+
+    this.livesLostText = this.game.add.text(this.game.world.centerX, this.game.world.centerY, 'Life Lost, Please Click To Continue', this.textStyle);
+    this.livesLostText.anchor.set(0.5);
+    this.livesLostText.visible = false;
+  }
+
+  OnBallLeaveScreen() {
+    this.lives--;
+    if(this.lives > 0) {
+      this.livesText.setText('Lives: ' + this.lives);
+      this.livesLostText.visible = true;
+      this.ball.reset(this.game.world.centerX, this.game.world.heigt - this.game.world.centerY/2);
+      this.player.reset(this.game.world.centerX, this.game.world.height - 32);
+      this.game.input.onDown.addOnce(this.OnContinue, this)
+    } else {
+      this.OnGameOver();
+    }
+  }
+
+  OnContinue() {
+    this.livesLostText.visible = false;
+    this.ball.body.velocity.set(150, -150);
+  }
+
+  OnGameOver() {
+    alert('Game Over!');
   }
 
   update() {
-    const hitPlatform = this.game.physics.arcade.collide(this.player, this.platforms);
+    this.watchForInput()
 
-    this.player.body.velocity.x = 0;
-
-    const cursors = this.game.input.keyboard.createCursorKeys();
-    this.player.watchForPlayerInput(cursors);
-
-    if(hitPlatform) {
-      this.player.watchForJump(cursors);
-    }
-
-    this.game.physics.arcade.collide(this.stars, this.platforms);
-    this.game.physics.arcade.overlap(this.player, this.stars, this.collectStar, null, this);
+    this.game.physics.arcade.collide(this.player, this.ball, this.onBallHitPaddle, null, this);
+    this.game.physics.arcade.collide(this.ball, this.blocks, this.OnBallHitBrick, null, this);
+  
   }
 
-  collectStar(player, star) {
-    star.kill();
+  watchForInput() {
+    const cursors = this.game.input.keyboard.createCursorKeys();
+    this.player.watchForPlayerInput(cursors);
+  }
 
-    this.score += 10;
-    this.scoreText.text = "Score: " + this.score;
+  OnBallHitBrick(ball, brick) {
+    const killTween = this.game.add.tween(brick.scale);
+
+    killTween.to({x:0, y:0}, 200, Phaser.Easing.Linear.None);
+    killTween.onComplete.addOnce(() => brick.kill());
+    killTween.start();
+    this.score+= 10;
+    this.scoreText.setText('Score: ' + this.score);
+  }
+
+  onBallHitPaddle(player, ball) {
+    ball.body.velocity.x = -1*5*(player.x-ball.x);
   }
 }
